@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,15 +82,29 @@ export default function ChannelsPage() {
           channels.map((ch) => (
             <Card key={ch.id}>
               <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <h3 className="font-medium">{ch.name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {ch.last_checked
-                      ? `Last checked ${formatTimeAgo(ch.last_checked)}`
-                      : "Never checked"}
-                  </p>
-                </div>
-                <div className="flex gap-2">
+                <Link
+                  href={`/channels/${ch.id}`}
+                  className="flex items-center gap-3 min-w-0 group"
+                >
+                  {ch.thumbnail && (
+                    <img
+                      src={ch.thumbnail}
+                      alt=""
+                      className="w-9 h-9 rounded-full object-cover shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="font-medium truncate group-hover:underline">
+                      {ch.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {ch.last_checked
+                        ? `Last checked ${formatTimeAgo(ch.last_checked)}`
+                        : "Never checked"}
+                    </p>
+                  </div>
+                </Link>
+                <div className="flex gap-2 shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
