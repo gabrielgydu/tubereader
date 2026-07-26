@@ -7,7 +7,13 @@ import { config, cookieArgs } from "../config";
 
 function runYtDlp(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("yt-dlp", args, { timeout: 600_000 });
+    // stdout is discarded at the OS level rather than piped: yt-dlp writes a
+    // progress line per fragment (>100KB for a long HLS track), and an unread
+    // pipe fills after ~64KB, blocking the download until the timeout kills it.
+    const proc = spawn("yt-dlp", args, {
+      timeout: 600_000,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
     let stderr = "";
     proc.stderr.on("data", (d) => (stderr += d));
     proc.on("close", (code, signal) => {
