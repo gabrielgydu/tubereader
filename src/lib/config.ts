@@ -22,6 +22,8 @@ function loadAssemblyAIKey(): string {
   );
 }
 
+let cachedKey: string | null = null;
+
 export const config = {
   dbPath:
     process.env.TUBEREADER_DB_PATH ||
@@ -29,7 +31,16 @@ export const config = {
   audioDir:
     process.env.TUBEREADER_AUDIO_DIR ||
     path.join(process.cwd(), "data", "audio"),
-  assemblyAIKey: loadAssemblyAIKey(),
+  // Where finished videos are mirrored as standalone markdown files, so they
+  // can be read and referenced from outside this app.
+  markdownDir:
+    process.env.TUBEREADER_MD_DIR ||
+    path.join(os.homedir(), "recordings", "tubereader"),
+  // Resolved on first use, not at import time: every module that touches the
+  // DB or the UI imports this file, and none of them need a transcription key.
+  get assemblyAIKey(): string {
+    return (cachedKey ??= loadAssemblyAIKey());
+  },
   maxConcurrency: 3,
   maxTranscriptLength: 100_000,
   // Browser to load cookies from for authenticated sources (Instagram).
@@ -39,11 +50,11 @@ export const config = {
 };
 
 /**
- * yt-dlp / gallery-dl cookie args. Instagram enumeration and downloads require
- * an authenticated session; YouTube is left unauthenticated (unchanged behavior).
+ * yt-dlp / gallery-dl cookie args. Instagram has always required an
+ * authenticated session; since ~mid-2026 YouTube blocks anonymous clients
+ * ("Sign in to confirm you're not a bot"), so cookies are passed for all
+ * platforms.
  */
-export function cookieArgs(platform: string): string[] {
-  return platform === "instagram"
-    ? ["--cookies-from-browser", config.browserCookies]
-    : [];
+export function cookieArgs(_platform: string): string[] {
+  return ["--cookies-from-browser", config.browserCookies];
 }

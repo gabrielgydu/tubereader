@@ -45,3 +45,9 @@ next-env.d.ts
 
 # tubereader cli
 .tubereader/
+
+# browser automation artifacts
+.playwright-cli/
+
+# generated knowledge bases / personal exports
+base_conhecimento_*.md
