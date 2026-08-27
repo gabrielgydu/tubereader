@@ -29,6 +29,7 @@ export interface Video {
   error_message: string | null;
   transcript: string | null;
   utterances: string | null;
+  formatted_transcript: string | null;
   verdict: string | null;
   summary: string | null;
   category: string | null;

@@ -7,7 +7,10 @@ export function Markdown({ children }: { children: string }) {
   const { fontCss, fontSize } = useReadingSettings();
 
   return (
-    <div style={{ fontFamily: fontCss, fontSize: `${fontSize}px` }}>
+    <div
+      className="break-words"
+      style={{ fontFamily: fontCss, fontSize: `${fontSize}px` }}
+    >
       <ReactMarkdown
         components={{
           h1: ({ children }) => (

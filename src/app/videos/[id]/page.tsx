@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Markdown } from "@/components/markdown";
+import { cn } from "@/lib/utils";
 import type { Video, Utterance, VideoTimestamp } from "@/lib/types";
 import { formatDuration, formatDate, formatViews, secondsToTimestamp } from "@/lib/format";
 import { externalUrl, embedUrl, supportsTimestampLinks } from "@/lib/source";
@@ -14,12 +15,20 @@ export default function VideoDetailPage() {
   const params = useParams();
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
+  const [transcriptView, setTranscriptView] = useState<"formatted" | "raw">(
+    "formatted"
+  );
+  const [formatting, setFormatting] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch(`/api/videos/${params.id}`)
       .then((r) => r.json())
       .then(setVideo)
       .finally(() => setLoading(false));
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [params.id]);
 
   if (loading) return <div className="p-6 text-muted-foreground">Loading...</div>;
@@ -34,6 +43,30 @@ export default function VideoDetailPage() {
   const timestamps: VideoTimestamp[] = video.timestamps
     ? JSON.parse(video.timestamps)
     : [];
+
+  async function handleFormat() {
+    setFormatting(true);
+    const res = await fetch(`/api/videos/${video!.id}/format`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      setFormatting(false);
+      return;
+    }
+    // Poll until the formatted transcript lands.
+    pollRef.current = setInterval(async () => {
+      const v: Video = await fetch(`/api/videos/${params.id}`).then((r) =>
+        r.json()
+      );
+      if (v.formatted_transcript) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        setVideo(v);
+        setTranscriptView("formatted");
+        setFormatting(false);
+      }
+    }, 5000);
+  }
 
   function handleExport() {
     const md = [
@@ -51,7 +84,7 @@ export default function VideoDetailPage() {
       ...takeaways.map((t) => `- ${t}`),
       "",
       "## Transcript",
-      video!.transcript || "",
+      video!.formatted_transcript || video!.transcript || "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -66,7 +99,7 @@ export default function VideoDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/" className="hover:underline">
           Feed
@@ -76,13 +109,18 @@ export default function VideoDetailPage() {
       </div>
 
       {/* Source embed. YouTube fills a 16:9 frame; the Instagram /embed endpoint
-          renders a fixed-layout card, so give it a portrait box without cropping. */}
+          renders a fixed-layout card, so give it a portrait box without cropping;
+          the SoundCloud widget is a full-width 166px strip. */}
       {embedUrl(video) && (
         <div
           className={
             video.platform === "instagram"
-              ? "mx-auto w-full max-w-[400px] h-[640px] rounded-lg overflow-hidden bg-black"
-              : "aspect-video rounded-lg overflow-hidden bg-black"
+              ? // Capped against the viewport too, so the fixed-layout card
+                // doesn't push a phone screen taller than it can show.
+                "mx-auto h-[min(640px,70svh)] w-full max-w-[400px] overflow-hidden rounded-lg bg-black"
+              : video.platform === "soundcloud"
+                ? "h-[166px] overflow-hidden rounded-lg"
+                : "aspect-video overflow-hidden rounded-lg bg-black"
           }
         >
           <iframe
@@ -96,8 +134,10 @@ export default function VideoDetailPage() {
 
       {/* Meta */}
       <div className="space-y-2">
-        <h1 className="text-xl font-bold">{video.title || video.youtube_id}</h1>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+        <h1 className="text-lg font-bold sm:text-xl">
+          {video.title || video.youtube_id}
+        </h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
           {video.channel && <span>{video.channel}</span>}
           {video.duration != null && <span>{formatDuration(video.duration)}</span>}
           {video.upload_date && <span>{formatDate(video.upload_date)}</span>}
@@ -112,7 +152,11 @@ export default function VideoDetailPage() {
             rel="noopener noreferrer"
             className="hover:underline"
           >
-            {video.platform === "instagram" ? "Open on Instagram ↗" : "Watch on YouTube ↗"}
+            {video.platform === "instagram"
+              ? "Open on Instagram ↗"
+              : video.platform === "soundcloud"
+                ? "Listen on SoundCloud ↗"
+                : "Watch on YouTube ↗"}
           </a>
         </div>
       </div>
@@ -188,14 +232,71 @@ export default function VideoDetailPage() {
       {/* Transcript */}
       {(video.transcript || utterances.length > 0) && (
         <div>
-          <div className="flex items-center justify-between mb-2">
+          {/* Sticky on mobile so the view toggle and export stay reachable
+              while reading a long transcript. */}
+          <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-30 -mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 bg-background/90 px-4 py-2 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
             <h2 className="text-lg font-semibold">Transcript</h2>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              Export Markdown
-            </Button>
+            <div className="flex items-center gap-2">
+              {video.formatted_transcript ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 px-3 md:h-7 md:px-2.5 md:text-[0.8rem]"
+                  onClick={() =>
+                    setTranscriptView((v) =>
+                      v === "formatted" ? "raw" : "formatted"
+                    )
+                  }
+                >
+                  {transcriptView === "formatted" ? "Show raw" : "Show formatted"}
+                </Button>
+              ) : (
+                video.transcript && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-3 md:h-7 md:px-2.5 md:text-[0.8rem]"
+                    disabled={formatting}
+                    onClick={handleFormat}
+                  >
+                    {formatting ? "Formatting…" : "Format for reading"}
+                  </Button>
+                )
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 px-3 md:h-7 md:px-2.5 md:text-[0.8rem]"
+                onClick={handleExport}
+              >
+                Export Markdown
+              </Button>
+              {/* The markdown mirror, opened in notas — a real link rather
+                  than a Button, since that is what it is. The route refreshes
+                  the file and redirects, so the URL stays server-side. */}
+              {(video.formatted_transcript || video.transcript) && (
+                <a
+                  href={`/api/videos/${video.id}/notas`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "h-10 px-3 md:h-7 md:px-2.5 md:text-[0.8rem]"
+                  )}
+                >
+                  Open in Notas ↗
+                </a>
+              )}
+            </div>
           </div>
-          <div className="bg-card rounded-lg p-4 max-h-[600px] overflow-y-auto">
-            {utterances.length > 0 ? (
+          {/* On a phone the transcript flows into the page — a scroll box
+              inside a scrolling page is miserable to read with a thumb. The
+              capped box comes back on desktop, where it keeps the sidebar and
+              metadata in view. */}
+          <div className="rounded-lg bg-card p-4 md:max-h-[600px] md:overflow-y-auto">
+            {video.formatted_transcript && transcriptView === "formatted" ? (
+              <Markdown>{video.formatted_transcript}</Markdown>
+            ) : utterances.length > 0 ? (
               <div className="space-y-3">
                 {utterances.map((u, i) => (
                   <div key={i} className="text-sm">
@@ -212,7 +313,9 @@ export default function VideoDetailPage() {
                 ))}
               </div>
             ) : (
-              <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono">
+              // break-words: an unbroken URL in a raw transcript would
+              // otherwise widen the page past a phone's viewport.
+              <pre className="font-mono text-sm break-words whitespace-pre-wrap text-muted-foreground">
                 {video.transcript}
               </pre>
             )}
@@ -228,7 +331,7 @@ export default function VideoDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            className="mt-2"
+            className="mt-2 h-10 px-3 md:h-7 md:px-2.5 md:text-[0.8rem]"
             onClick={async () => {
               await fetch(`/api/videos/${video.id}/retry`, { method: "POST" });
               window.location.reload();

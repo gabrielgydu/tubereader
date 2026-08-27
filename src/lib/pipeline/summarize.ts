@@ -1,7 +1,7 @@
-import { spawn } from "child_process";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { config } from "../config";
+import { runClaude } from "./claude";
 import type { SummaryResult } from "../types";
 
 const SYSTEM_PROMPT = `You are a video summarizer. Analyze the transcript and return ONLY valid JSON matching this schema:
@@ -17,37 +17,6 @@ const SYSTEM_PROMPT = `You are a video summarizer. Analyze the transcript and re
 IMPORTANT: Write the verdict, keyTakeaways, summary, and timestamp labels in the SAME LANGUAGE as the transcript. If the transcript is in Portuguese, write everything in Portuguese. If English, write in English. Match the language exactly.
 
 Return ONLY the JSON object, no markdown fences, no explanation.`;
-
-function runClaude(userPrompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(
-      "claude",
-      [
-        "-p", "-",
-        "--model", "sonnet",
-        "--output-format", "json",
-        "--system-prompt", SYSTEM_PROMPT,
-      ],
-      { timeout: 300_000 }
-    );
-
-    const chunks: Buffer[] = [];
-    proc.stdout.on("data", (d) => chunks.push(d));
-
-    let stderr = "";
-    proc.stderr.on("data", (d) => (stderr += d));
-
-    proc.on("close", (code) => {
-      const stdout = Buffer.concat(chunks).toString();
-      if (stdout.trim()) resolve(stdout);
-      else reject(new Error(`claude exited ${code}: ${stderr.slice(-500)}`));
-    });
-    proc.on("error", reject);
-
-    proc.stdin.write(userPrompt);
-    proc.stdin.end();
-  });
-}
 
 export async function summarizeTranscript(videoId: number): Promise<void> {
   const video = db
@@ -91,7 +60,11 @@ ${transcript}`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const stdout = await runClaude(userPrompt);
+      const stdout = await runClaude({
+        systemPrompt: SYSTEM_PROMPT,
+        input: userPrompt,
+        json: true,
+      });
       const parsed = JSON.parse(stdout);
       const resultText = parsed.result;
       let inner: SummaryResult;

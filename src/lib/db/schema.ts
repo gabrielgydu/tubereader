@@ -25,6 +25,8 @@ export const videos = sqliteTable("videos", {
   error_message: text("error_message"),
   transcript: text("transcript"),
   utterances: text("utterances"),
+  // Reading view: transcript reorganized into markdown paragraphs + headings.
+  formatted_transcript: text("formatted_transcript"),
   verdict: text("verdict"),
   summary: text("summary"),
   category: text("category"),

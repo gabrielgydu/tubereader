@@ -34,6 +34,7 @@ function createDb() {
       error_message TEXT,
       transcript TEXT,
       utterances TEXT,
+      formatted_transcript TEXT,
       verdict TEXT,
       summary TEXT,
       category TEXT,
@@ -96,6 +97,9 @@ function createDb() {
   }
   if (!videoCols.some((c) => c.name === "source_url")) {
     sqlite.exec("ALTER TABLE videos ADD COLUMN source_url TEXT");
+  }
+  if (!videoCols.some((c) => c.name === "formatted_transcript")) {
+    sqlite.exec("ALTER TABLE videos ADD COLUMN formatted_transcript TEXT");
   }
   const channelCols = sqlite.pragma("table_info(channels)") as { name: string }[];
   if (!channelCols.some((c) => c.name === "platform")) {
