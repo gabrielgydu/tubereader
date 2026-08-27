@@ -15,9 +15,9 @@ export default function FeedPage() {
   );
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <div>
-        <h1 className="text-2xl font-bold mb-4">Feed</h1>
+        <h1 className="mb-4 text-xl font-bold md:text-2xl">Feed</h1>
         <VideoSubmit onSubmitted={refetch} />
       </div>
 
@@ -26,7 +26,7 @@ export default function FeedPage() {
           <p className="text-sm text-muted-foreground">Loading...</p>
         ) : videos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No videos yet. Paste some YouTube or Instagram reel URLs above to get started.
+            No videos yet. Paste some YouTube, Instagram, or SoundCloud URLs above to get started.
           </p>
         ) : (
           videos.map((video) => (

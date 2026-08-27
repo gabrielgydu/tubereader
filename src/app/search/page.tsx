@@ -32,17 +32,19 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Search</h1>
+    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+      <h1 className="text-xl font-bold md:text-2xl">Search</h1>
 
+      {/* h-11 on touch, back to the compact desktop sizing at md. */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <Input
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search transcripts, titles, summaries..."
-          className="flex-1"
+          className="h-11 flex-1 md:h-8"
         />
-        <Button type="submit" size="sm">
+        <Button type="submit" className="h-11 px-4 md:h-7 md:px-2.5 md:text-[0.8rem]">
           Search
         </Button>
       </form>

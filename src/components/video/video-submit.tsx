@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { RejectedUrl } from "@/lib/source";
 
 export function VideoSubmit({ onSubmitted }: { onSubmitted?: () => void }) {
   const [urls, setUrls] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rejected, setRejected] = useState<RejectedUrl[]>([]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setRejected([]);
     const lines = urls
       .split(/[\n,]+/)
       .map((s) => s.trim())
@@ -26,12 +29,21 @@ export function VideoSubmit({ onSubmitted }: { onSubmitted?: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ urls: lines }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+      const data: {
+        accepted?: unknown[];
+        rejected?: RejectedUrl[];
+        error?: string;
+      } = await res.json().catch(() => ({}));
+      // An all-rejected batch answers 400, but the per-URL reasons are more
+      // useful than the status, so only fall back to `error` without them.
+      const bad = data.rejected ?? [];
+      if (!res.ok && bad.length === 0) {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setUrls("");
-      onSubmitted?.();
+      setRejected(bad);
+      // Leave the rejected URLs in the box so they can be fixed and resent.
+      setUrls(bad.map((r) => r.url).join("\n"));
+      if ((data.accepted?.length ?? 0) > 0) onSubmitted?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
     } finally {
@@ -44,12 +56,31 @@ export function VideoSubmit({ onSubmitted }: { onSubmitted?: () => void }) {
       <Textarea
         value={urls}
         onChange={(e) => setUrls(e.target.value)}
-        placeholder="Paste YouTube or Instagram reel URLs (one per line, or comma-separated)..."
+        placeholder="Paste YouTube, Instagram, or SoundCloud URLs (one per line, or comma-separated)..."
         rows={3}
-        className="resize-none font-mono text-sm"
+        // URLs, so none of iOS's typing assistance helps here.
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="url"
+        className="resize-none font-mono text-base md:text-sm"
       />
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={submitting || !urls.trim()} size="sm">
+      {rejected.length > 0 && (
+        <ul className="space-y-1 text-sm text-destructive">
+          {rejected.map((r, i) => (
+            <li key={`${i}-${r.url}`}>
+              <span className="break-all font-mono text-xs">{r.url}</span>{" "}
+              &mdash; {r.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        type="submit"
+        disabled={submitting || !urls.trim()}
+        className="h-11 w-full md:h-7 md:w-auto md:px-2.5 md:text-[0.8rem]"
+      >
         {submitting ? "Submitting..." : "Process Videos"}
       </Button>
     </form>

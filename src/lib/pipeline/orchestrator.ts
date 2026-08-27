@@ -5,6 +5,7 @@ import { extractMetadata } from "./metadata";
 import { downloadAudio } from "./download";
 import { transcribeAudio } from "./transcribe";
 import { summarizeTranscript } from "./summarize";
+import { exportVideoMarkdown } from "./export-video-md";
 import { config } from "../config";
 import type { PipelineEvent, VideoStatus } from "../types";
 
@@ -152,6 +153,10 @@ class Orchestrator extends EventEmitter {
 
       // Stage 4: Summarize
       await withStageTimeout("summarize", summarizeTranscript(videoId));
+
+      // Mirror the finished video to markdown. Last, so the file carries the
+      // summary and takeaways rather than a bare transcript.
+      exportVideoMarkdown(videoId);
       this.emitEvent(videoId, "complete");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -159,6 +164,9 @@ class Orchestrator extends EventEmitter {
         .set({ status: "error", error_message: message })
         .where(eq(schema.videos.id, videoId))
         .run();
+      // A transcript that survived a later stage failure is still worth having
+      // on disk; this no-ops when transcription never got that far.
+      exportVideoMarkdown(videoId);
       this.emitEvent(videoId, "error", { error: message });
     }
   }

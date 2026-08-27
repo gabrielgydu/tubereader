@@ -11,6 +11,8 @@ interface YtDlpMetadata {
   channel_id: string | null;
   channel_url: string | null;
   uploader: string | null;
+  uploader_id: string | null;
+  uploader_url: string | null;
   duration: number;
   upload_date: string;
   thumbnail: string;
@@ -71,27 +73,32 @@ export async function extractMetadata(videoId: number): Promise<void> {
 
   const meta: YtDlpMetadata = JSON.parse(stdout);
   const isInstagram = video.platform === "instagram";
+  const isSoundcloud = video.platform === "soundcloud";
 
   // A subscription's channel_id (set at ingest) is authoritative — never
   // overwrite it, so channel-filtered videos stay linked to their channel.
   // Only derive one when absent (e.g. a single reel pasted directly). yt-dlp
-  // returns no channel_id for Instagram, so key it by username.
-  const derivedChannelId = isInstagram
-    ? meta.channel
-      ? instagramChannelId(meta.channel)
-      : null
-    : meta.channel_id;
-  const channelId = video.channel_id ?? derivedChannelId;
-
-  const channelName = isInstagram
-    ? meta.uploader || meta.channel
-    : meta.channel;
-
-  const channelUrl = isInstagram
-    ? meta.channel
+  // returns no channel_* for Instagram (key by username) or SoundCloud (key
+  // by the numeric uploader id).
+  let derivedChannelId: string | null;
+  let channelName: string | null;
+  let channelUrl: string | null;
+  if (isInstagram) {
+    derivedChannelId = meta.channel ? instagramChannelId(meta.channel) : null;
+    channelName = meta.uploader || meta.channel;
+    channelUrl = meta.channel
       ? `https://www.instagram.com/${meta.channel}/`
-      : video.channel_url
-    : meta.channel_url;
+      : video.channel_url;
+  } else if (isSoundcloud) {
+    derivedChannelId = meta.uploader_id ? `sc:${meta.uploader_id}` : null;
+    channelName = meta.uploader;
+    channelUrl = meta.uploader_url;
+  } else {
+    derivedChannelId = meta.channel_id;
+    channelName = meta.channel;
+    channelUrl = meta.channel_url;
+  }
+  const channelId = video.channel_id ?? derivedChannelId;
 
   db.update(schema.videos)
     .set({
@@ -99,7 +106,8 @@ export async function extractMetadata(videoId: number): Promise<void> {
       channel: channelName,
       channel_id: channelId,
       channel_url: channelUrl,
-      duration: meta.duration,
+      // SoundCloud reports fractional seconds; the column and UI expect ints.
+      duration: meta.duration != null ? Math.round(meta.duration) : meta.duration,
       upload_date: meta.upload_date,
       thumbnail: meta.thumbnail,
       description: meta.description?.slice(0, 5000) || null,

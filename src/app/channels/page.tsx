@@ -58,17 +58,25 @@ export default function ChannelsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Channels</h1>
+    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+      <h1 className="text-xl font-bold md:text-2xl">Channels</h1>
 
       <form onSubmit={handleSubscribe} className="flex gap-2">
         <Input
+          type="url"
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste a YouTube channel or Instagram profile URL..."
-          className="flex-1"
+          className="h-11 flex-1 md:h-8"
         />
-        <Button type="submit" disabled={loading || !url.trim()} size="sm">
+        <Button
+          type="submit"
+          disabled={loading || !url.trim()}
+          className="h-11 px-4 md:h-7 md:px-2.5 md:text-[0.8rem]"
+        >
           {loading ? "Subscribing..." : "Subscribe"}
         </Button>
       </form>
@@ -81,20 +89,23 @@ export default function ChannelsPage() {
         ) : (
           channels.map((ch) => (
             <Card key={ch.id}>
-              <CardContent className="flex items-center justify-between p-4">
+              {/* Name and actions sit side by side once there's room; on a
+                  phone the actions drop to their own full-width row rather
+                  than squeezing the channel name to nothing. */}
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <Link
                   href={`/channels/${ch.id}`}
-                  className="flex items-center gap-3 min-w-0 group"
+                  className="group flex min-w-0 items-center gap-3"
                 >
                   {ch.thumbnail && (
                     <img
                       src={ch.thumbnail}
                       alt=""
-                      className="w-9 h-9 rounded-full object-cover shrink-0"
+                      className="size-9 shrink-0 rounded-full object-cover"
                     />
                   )}
                   <div className="min-w-0">
-                    <h3 className="font-medium truncate group-hover:underline">
+                    <h3 className="truncate font-medium group-hover:underline">
                       {ch.name}
                     </h3>
                     <p className="text-xs text-muted-foreground">
@@ -104,19 +115,19 @@ export default function ChannelsPage() {
                     </p>
                   </div>
                 </Link>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex shrink-0 gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => handleRefresh(ch.id)}
                     disabled={refreshing === ch.id}
+                    className="h-10 flex-1 sm:h-7 sm:flex-none sm:px-2.5 sm:text-[0.8rem]"
                   >
                     {refreshing === ch.id ? "Checking..." : "Check for new"}
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
                     onClick={() => handleUnsubscribe(ch.id)}
+                    className="h-10 flex-1 sm:h-7 sm:flex-none sm:px-2.5 sm:text-[0.8rem]"
                   >
                     Unsubscribe
                   </Button>

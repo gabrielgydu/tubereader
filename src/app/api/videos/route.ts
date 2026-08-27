@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { desc, eq, asc, isNull, isNotNull, and } from "drizzle-orm";
-import { parseSource } from "@/lib/source";
+import type { RejectedUrl } from "@/lib/source";
+import { resolveSource } from "@/lib/resolve-source";
 import { getOrchestrator } from "@/lib/pipeline/orchestrator";
 
 export async function GET(req: NextRequest) {
@@ -61,13 +62,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "urls array required" }, { status: 400 });
   }
 
-  const results: { youtube_id: string; id: number; new: boolean }[] = [];
+  const accepted: { youtube_id: string; id: number; new: boolean }[] = [];
+  const rejected: RejectedUrl[] = [];
   const toProcess: number[] = [];
 
-  for (const url of urls) {
-    if (typeof url !== "string") continue;
-    const source = parseSource(url.trim());
-    if (!source) continue;
+  // Resolution can hit the network (short links), so run it for the whole batch
+  // at once — one slow shortener then can't delay the rest.
+  const resolutions = await Promise.all(
+    urls.map(async (url) => {
+      const trimmed = typeof url === "string" ? url.trim() : "";
+      return trimmed
+        ? { url: trimmed, resolved: await resolveSource(trimmed) }
+        : { url: String(url), resolved: null };
+    })
+  );
+
+  for (const { url, resolved } of resolutions) {
+    if (!resolved) {
+      rejected.push({ url, reason: "unsupported", message: "not a URL" });
+      continue;
+    }
+    if (!resolved.ok) {
+      rejected.push({ url, reason: resolved.reason, message: resolved.message });
+      continue;
+    }
+    const source = resolved.source;
 
     const existing = db
       .select()
@@ -76,7 +95,7 @@ export async function POST(req: NextRequest) {
       .get();
 
     if (existing) {
-      results.push({ youtube_id: source.sourceId, id: existing.id, new: false });
+      accepted.push({ youtube_id: source.sourceId, id: existing.id, new: false });
       if (existing.status === "error") {
         db.update(schema.videos)
           .set({ status: "pending", error_message: null })
@@ -99,7 +118,7 @@ export async function POST(req: NextRequest) {
       .returning()
       .get();
 
-    results.push({ youtube_id: source.sourceId, id: inserted.id, new: true });
+    accepted.push({ youtube_id: source.sourceId, id: inserted.id, new: true });
     toProcess.push(inserted.id);
   }
 
@@ -110,5 +129,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json(results, { status: 201 });
+  // A mixed batch still enqueues what it can; nothing usable is a client error.
+  // `error` summarises the rejections for callers that only read that field.
+  if (accepted.length === 0) {
+    return NextResponse.json(
+      {
+        accepted,
+        rejected,
+        error:
+          rejected.length === 1
+            ? rejected[0].message
+            : `all ${rejected.length} URLs rejected`,
+      },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json({ accepted, rejected }, { status: 201 });
 }

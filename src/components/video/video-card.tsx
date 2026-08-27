@@ -61,31 +61,32 @@ export function VideoCard({
       <CardContent className="p-0">
         {/* Collapsed row */}
         <div
-          className="flex gap-4 p-4 cursor-pointer"
+          className="flex cursor-pointer gap-3 p-3 sm:gap-4 sm:p-4"
           onClick={cycleLevel}
         >
           {video.thumbnail && (
             <img
               src={video.thumbnail}
               alt=""
-              className="w-40 h-[90px] object-cover rounded-md shrink-0"
+              className="h-[63px] w-28 shrink-0 rounded-md object-cover sm:h-[90px] sm:w-40"
             />
           )}
-          <div className="flex-1 min-w-0 space-y-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <div className="flex items-start justify-between gap-2">
               <Link
                 href={`/videos/${video.id}`}
-                className="font-medium text-sm leading-snug hover:underline line-clamp-2"
+                className="line-clamp-2 text-sm leading-snug font-medium hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
                 {video.title || video.youtube_id}
               </Link>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {video.status === "complete" && (
                   <button
                     onClick={toggleRead}
-                    className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    className="tap-target rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     title={video.read_at ? "Mark as unread" : "Mark as read"}
+                    aria-label={video.read_at ? "Mark as unread" : "Mark as read"}
                   >
                     {video.read_at ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -102,27 +103,19 @@ export function VideoCard({
                 </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {video.channel && <span>{video.channel}</span>}
-              {video.duration != null && (
-                <>
-                  <span>·</span>
-                  <span>{formatDuration(video.duration)}</span>
-                </>
-              )}
-              {video.upload_date && (
-                <>
-                  <span>·</span>
-                  <span>{formatDate(video.upload_date)}</span>
-                </>
-              )}
-              {video.view_count != null && (
-                <>
-                  <span>·</span>
-                  <span>{formatViews(video.view_count)}</span>
-                </>
-              )}
-            </div>
+            {/* One truncating line rather than a wrapping row of separate
+                spans: wrapping strands a "·" at the end of a line on a narrow
+                phone, and this row is the least important thing on the card. */}
+            <p className="truncate text-xs text-muted-foreground">
+              {[
+                video.channel,
+                video.duration != null && formatDuration(video.duration),
+                video.upload_date && formatDate(video.upload_date),
+                video.view_count != null && formatViews(video.view_count),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
             {video.category && (
               <Badge variant="outline" className="text-xs">
                 {video.category}
@@ -146,7 +139,7 @@ export function VideoCard({
 
         {/* Summary level */}
         {level !== "collapsed" && video.status === "complete" && (
-          <div className="px-4 pb-4 border-t border-border pt-3 space-y-3">
+          <div className="space-y-3 border-t border-border px-3 pt-3 pb-4 sm:px-4">
             {takeaways.length > 0 && (
               <div>
                 <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-1">
@@ -183,7 +176,7 @@ export function VideoCard({
                         href={externalUrl(video, ts.time)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs bg-accent px-2 py-1 rounded hover:bg-accent/80"
+                        className="flex min-h-9 items-center rounded bg-accent px-2.5 py-1.5 text-xs hover:bg-accent/80"
                         title={ts.description}
                       >
                         {secondsToTimestamp(ts.time)} — {ts.label}
@@ -191,7 +184,7 @@ export function VideoCard({
                     ) : (
                       <span
                         key={i}
-                        className="text-xs bg-accent px-2 py-1 rounded"
+                        className="flex min-h-9 items-center rounded bg-accent px-2.5 py-1.5 text-xs"
                         title={ts.description}
                       >
                         {secondsToTimestamp(ts.time)} — {ts.label}
@@ -206,7 +199,7 @@ export function VideoCard({
 
         {/* Full level — transcript */}
         {level === "full" && video.transcript && (
-          <div className="px-4 pb-4 border-t border-border pt-3">
+          <div className="border-t border-border px-3 pt-3 pb-4 sm:px-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-semibold uppercase text-muted-foreground">
                 Transcript
@@ -218,7 +211,9 @@ export function VideoCard({
                 Full view
               </Link>
             </div>
-            <div className="max-h-64 overflow-y-auto text-sm font-mono text-muted-foreground whitespace-pre-wrap">
+            {/* A preview, so the nested scroll stays — `overscroll-contain`
+                keeps a flick from chaining into the page behind it. */}
+            <div className="max-h-64 overflow-y-auto overscroll-contain font-mono text-sm whitespace-pre-wrap text-muted-foreground">
               {video.transcript.slice(0, 3000)}
               {video.transcript.length > 3000 && "..."}
             </div>

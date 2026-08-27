@@ -61,7 +61,7 @@ export default function ChannelFeedPage() {
   const missing = resolved != null && resolved.channel == null;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <div className="space-y-2">
         <Link
           href="/channels"
@@ -77,7 +77,7 @@ export default function ChannelFeedPage() {
               className="w-10 h-10 rounded-full object-cover shrink-0"
             />
           )}
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-xl font-bold md:text-2xl">
             {channel ? channel.name : missing ? "Channel not found" : "…"}
           </h1>
         </div>
