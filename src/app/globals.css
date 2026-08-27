@@ -123,8 +123,27 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Installed as a standalone PWA there is no browser chrome to rubber-band
+       against, so the bounce just exposes a blank strip. */
+    overscroll-behavior-y: none;
   }
   html {
     @apply font-sans;
+    /* iOS otherwise inflates text in landscape, which fights the in-app
+       font-size control. */
+    -webkit-text-size-adjust: 100%;
   }
+  /* Touch devices get no hover state, so the grey flash on every tap is pure
+     noise; :active styles carry the feedback instead. */
+  @media (hover: none) {
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+}
+
+@utility tap-target {
+  /* Minimum comfortable touch size (Apple HIG / WCAG 2.5.8). Applied to icon
+     buttons that are visually smaller than they need to be hittable. */
+  @apply relative after:absolute after:top-1/2 after:left-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''];
 }

@@ -1,0 +1,15 @@
+<!-- Maskable variant of mark.svg: same shapes, scaled to 72% and recentred so
+     everything stays inside the 80%-diameter safe circle Android crops to.
+     Keep in sync with mark.svg by hand — the shapes are duplicated rather than
+     <use>-referenced so each file rasterizes standalone. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0a0a0a"/>
+  <!-- mark.svg's content spans y 89..426, so its centre sits at 257.5, not 256. -->
+  <g fill="#fafafa" transform="translate(256 256) scale(0.72) translate(-256 -257.5)">
+    <path d="M205 106 L205 246 L327 176 Z"
+          stroke="#fafafa" stroke-width="34" stroke-linejoin="round"/>
+    <rect x="116" y="292" width="280" height="30" rx="15"/>
+    <rect x="116" y="344" width="280" height="30" rx="15"/>
+    <rect x="116" y="396" width="176" height="30" rx="15" fill-opacity="0.45"/>
+  </g>
+</svg>
