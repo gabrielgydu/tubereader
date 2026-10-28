@@ -3,6 +3,7 @@ export type VideoStatus =
   | "metadata"
   | "downloading"
   | "transcribing"
+  | "formatting"
   | "summarizing"
   | "complete"
   | "error";
@@ -27,6 +28,9 @@ export interface Video {
   like_count: number | null;
   status: VideoStatus;
   error_message: string | null;
+  want_summary: boolean;
+  want_format: boolean;
+  vocabulary: string | null;
   transcript: string | null;
   utterances: string | null;
   formatted_transcript: string | null;
@@ -49,6 +53,19 @@ export interface Channel {
   thumbnail: string | null;
   last_checked: string | null;
   created_at: string;
+}
+
+/**
+ * A channel derived from the videos already in the library (grouped by
+ * channel_id), independent of whether it is subscribed. Powers "Browse by
+ * channel" — seeing everything from one channel without subscribing to it.
+ */
+export interface LibraryChannel {
+  channel_id: string;
+  name: string;
+  platform: string;
+  count: number;
+  subscribed: boolean;
 }
 
 export interface Utterance {

@@ -128,6 +128,7 @@ export function renderVideoMarkdown(video: VideoRow): string {
   if (date) frontmatter.push(`upload_date: ${date}`);
   if (video.duration) frontmatter.push(`duration: ${video.duration}`);
   if (video.category) frontmatter.push(`category: ${video.category}`);
+  if (video.vocabulary) frontmatter.push(`vocabulary: ${video.vocabulary}`);
   frontmatter.push(`source: tubereader`);
   frontmatter.push("---");
 

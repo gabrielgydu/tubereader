@@ -15,6 +15,7 @@ const statusColors: Record<string, string> = {
   metadata: "bg-blue-500/20 text-blue-400",
   downloading: "bg-blue-500/20 text-blue-400",
   transcribing: "bg-purple-500/20 text-purple-400",
+  formatting: "bg-teal-500/20 text-teal-400",
   summarizing: "bg-indigo-500/20 text-indigo-400",
   complete: "bg-green-500/20 text-green-400",
   error: "bg-red-500/20 text-red-400",

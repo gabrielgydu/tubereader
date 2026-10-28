@@ -18,7 +18,25 @@ IMPORTANT: Write the verdict, keyTakeaways, summary, and timestamp labels in the
 
 Return ONLY the JSON object, no markdown fences, no explanation.`;
 
+const inFlight = new Set<number>();
+
+/**
+ * Summarize a video's transcript into verdict/takeaways/summary/timestamps and
+ * mark it complete. Also usable on demand after a transcript-only submission.
+ * The inFlight guard mirrors formatTranscript — it stops a manual re-summarize
+ * from racing the pipeline (or itself on a double click) for the same video.
+ */
 export async function summarizeTranscript(videoId: number): Promise<void> {
+  if (inFlight.has(videoId)) return;
+  inFlight.add(videoId);
+  try {
+    await runSummarize(videoId);
+  } finally {
+    inFlight.delete(videoId);
+  }
+}
+
+async function runSummarize(videoId: number): Promise<void> {
   const video = db
     .select()
     .from(schema.videos)

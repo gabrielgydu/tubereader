@@ -4,6 +4,7 @@ import { desc, eq, asc, isNull, isNotNull, and } from "drizzle-orm";
 import type { RejectedUrl } from "@/lib/source";
 import { resolveSource } from "@/lib/resolve-source";
 import { getOrchestrator } from "@/lib/pipeline/orchestrator";
+import { isVocabularyName } from "@/lib/vocabulary";
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
@@ -62,6 +63,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "urls array required" }, { status: 400 });
   }
 
+  // Optional per-submission processing choices. Transcription always runs;
+  // these gate the two expensive Claude stages. Default off.
+  const fields = body as
+    | { summarize?: unknown; format?: unknown; vocabulary?: unknown }
+    | null;
+  const wantSummary = fields?.summarize === true;
+  const wantFormat = fields?.format === true;
+
+  // Optional transcription vocabulary (lib/vocabulary). An unknown name is a
+  // client error, not something to drop silently: it would cost a transcript
+  // made without the terms the caller asked for.
+  const rawVocabulary = fields?.vocabulary ?? null;
+  if (rawVocabulary !== null && !isVocabularyName(rawVocabulary)) {
+    return NextResponse.json(
+      { error: `unknown vocabulary: ${String(rawVocabulary)}` },
+      { status: 400 }
+    );
+  }
+  const vocabulary = rawVocabulary;
+
   const accepted: { youtube_id: string; id: number; new: boolean }[] = [];
   const rejected: RejectedUrl[] = [];
   const toProcess: number[] = [];
@@ -97,8 +118,15 @@ export async function POST(req: NextRequest) {
     if (existing) {
       accepted.push({ youtube_id: source.sourceId, id: existing.id, new: false });
       if (existing.status === "error") {
+        // A retry adopts the choices from this submission.
         db.update(schema.videos)
-          .set({ status: "pending", error_message: null })
+          .set({
+            status: "pending",
+            error_message: null,
+            want_summary: wantSummary,
+            want_format: wantFormat,
+            vocabulary,
+          })
           .where(eq(schema.videos.id, existing.id))
           .run();
         toProcess.push(existing.id);
@@ -113,6 +141,9 @@ export async function POST(req: NextRequest) {
         platform: source.platform,
         source_url: source.sourceUrl,
         status: "pending",
+        want_summary: wantSummary,
+        want_format: wantFormat,
+        vocabulary,
         created_at: new Date().toISOString(),
       })
       .returning()

@@ -97,6 +97,24 @@ redirecting, so the tab always shows what the database holds now.
 resolves there — the phone gets a dead tab unless notas is published somewhere
 it can reach and `TUBEREADER_NOTAS_URL` points at that address.
 
+## Transcription vocabularies
+
+AssemblyAI mishears proper nouns it rarely hears: Catholic meditations came back with "São José Maria" for "São Josemaria".
+
+A submission can name a vocabulary, with the **Vocabulary** picker under the URL box (remembered like the two checkboxes) or `"vocabulary": "catolico"` in a `POST /api/videos` body.
+
+Its key terms go to AssemblyAI's `keyterms_prompt` and its fixed spellings to `custom_spelling`.
+
+The model list is then pinned to Universal-3.5 Pro with Universal-2 as fallback, since key terms need one of those.
+
+Vocabularies live in `src/lib/vocabulary.ts`.
+
+Keep each list under 200 terms of at most 6 words (the Universal-2 limit), and each `custom_spelling` target a single word (AssemblyAI rejects anything else).
+
+The choice is stored on the video (`videos.vocabulary`), so a retry reuses it, and the markdown mirror records it in its frontmatter.
+
+Share-sheet submissions don't pick one.
+
 ## Layout
 
 - `src/app/` — routes. `api/` holds the REST + SSE endpoints; `manifest.ts` is

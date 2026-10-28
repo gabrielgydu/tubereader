@@ -2,6 +2,7 @@ import { readFileSync, unlinkSync, existsSync } from "fs";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { config } from "../config";
+import { VOCABULARIES, isVocabularyName } from "../vocabulary";
 
 const API_BASE = "https://api.assemblyai.com/v2";
 
@@ -89,7 +90,25 @@ async function uploadAudio(filePath: string): Promise<string> {
   );
 }
 
-async function submitTranscript(uploadUrl: string): Promise<string> {
+/**
+ * Request fields for a transcription vocabulary. Key terms are a Universal-3.5
+ * Pro / Universal-2 feature, so the model list is pinned (with Universal-2 as
+ * the fallback AssemblyAI recommends) rather than left to the account default.
+ */
+function vocabularyFields(name: string | null): Record<string, unknown> {
+  if (!isVocabularyName(name)) return {};
+  const v = VOCABULARIES[name];
+  return {
+    speech_models: ["universal-3-5-pro", "universal-2"],
+    keyterms_prompt: v.keyterms,
+    custom_spelling: v.customSpelling,
+  };
+}
+
+async function submitTranscript(
+  uploadUrl: string,
+  vocabulary: string | null
+): Promise<string> {
   let lastError = "unknown error";
 
   for (let attempt = 1; attempt <= MAX_SUBMIT_ATTEMPTS; attempt++) {
@@ -100,6 +119,7 @@ async function submitTranscript(uploadUrl: string): Promise<string> {
           audio_url: uploadUrl,
           speaker_labels: true,
           language_detection: true,
+          ...vocabularyFields(vocabulary),
         }),
       });
       const body = await res.text();
@@ -218,7 +238,7 @@ export async function transcribeAudio(
 
   try {
     const uploadUrl = await uploadAudio(audioPath);
-    const transcriptId = await submitTranscript(uploadUrl);
+    const transcriptId = await submitTranscript(uploadUrl, video.vocabulary);
     const { text, utterances: rawUtterances } = await pollTranscript(transcriptId);
 
     const utterances = (rawUtterances || []).map((u) => ({

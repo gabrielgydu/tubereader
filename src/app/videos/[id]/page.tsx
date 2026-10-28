@@ -19,7 +19,9 @@ export default function VideoDetailPage() {
     "formatted"
   );
   const [formatting, setFormatting] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch(`/api/videos/${params.id}`)
@@ -28,6 +30,7 @@ export default function VideoDetailPage() {
       .finally(() => setLoading(false));
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (summaryPollRef.current) clearInterval(summaryPollRef.current);
     };
   }, [params.id]);
 
@@ -64,6 +67,29 @@ export default function VideoDetailPage() {
         setVideo(v);
         setTranscriptView("formatted");
         setFormatting(false);
+      }
+    }, 5000);
+  }
+
+  async function handleSummarize() {
+    setSummarizing(true);
+    const res = await fetch(`/api/videos/${video!.id}/summarize`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      setSummarizing(false);
+      return;
+    }
+    // Poll until the summary lands.
+    summaryPollRef.current = setInterval(async () => {
+      const v: Video = await fetch(`/api/videos/${params.id}`).then((r) =>
+        r.json()
+      );
+      if (v.summary) {
+        if (summaryPollRef.current) clearInterval(summaryPollRef.current);
+        summaryPollRef.current = null;
+        setVideo(v);
+        setSummarizing(false);
       }
     }, 5000);
   }
@@ -160,6 +186,23 @@ export default function VideoDetailPage() {
           </a>
         </div>
       </div>
+
+      {/* Summarize on demand — for a transcript-only video (submitted with the
+          Summarize box unchecked) or one whose summary never ran. Mirrors the
+          "Format for reading" affordance so the choice isn't one-shot. */}
+      {video.transcript &&
+        !video.summary &&
+        (video.status === "complete" || video.status === "error") && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 px-3 md:h-7 md:px-2.5 md:text-[0.8rem]"
+            disabled={summarizing}
+            onClick={handleSummarize}
+          >
+            {summarizing ? "Summarizing…" : "Summarize"}
+          </Button>
+        )}
 
       {/* Verdict */}
       {video.verdict && (

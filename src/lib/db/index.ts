@@ -32,6 +32,9 @@ function createDb() {
       like_count INTEGER,
       status TEXT NOT NULL DEFAULT 'pending',
       error_message TEXT,
+      want_summary INTEGER NOT NULL DEFAULT 0,
+      want_format INTEGER NOT NULL DEFAULT 0,
+      vocabulary TEXT,
       transcript TEXT,
       utterances TEXT,
       formatted_transcript TEXT,
@@ -100,6 +103,19 @@ function createDb() {
   }
   if (!videoCols.some((c) => c.name === "formatted_transcript")) {
     sqlite.exec("ALTER TABLE videos ADD COLUMN formatted_transcript TEXT");
+  }
+  if (!videoCols.some((c) => c.name === "want_summary")) {
+    sqlite.exec(
+      "ALTER TABLE videos ADD COLUMN want_summary INTEGER NOT NULL DEFAULT 0"
+    );
+  }
+  if (!videoCols.some((c) => c.name === "want_format")) {
+    sqlite.exec(
+      "ALTER TABLE videos ADD COLUMN want_format INTEGER NOT NULL DEFAULT 0"
+    );
+  }
+  if (!videoCols.some((c) => c.name === "vocabulary")) {
+    sqlite.exec("ALTER TABLE videos ADD COLUMN vocabulary TEXT");
   }
   const channelCols = sqlite.pragma("table_info(channels)") as { name: string }[];
   if (!channelCols.some((c) => c.name === "platform")) {

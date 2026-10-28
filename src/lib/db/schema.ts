@@ -23,6 +23,18 @@ export const videos = sqliteTable("videos", {
   like_count: integer("like_count"),
   status: text("status").notNull().default("pending"),
   error_message: text("error_message"),
+  // Per-submission processing choices. Transcription always runs; these gate
+  // the two optional (and expensive) Claude stages. Persisted on the row so a
+  // server restart mid-pipeline honors the original choice.
+  want_summary: integer("want_summary", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  want_format: integer("want_format", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  // Transcription vocabulary (a key of VOCABULARIES in lib/vocabulary), or
+  // null for none. Chosen per submission, like the two flags above.
+  vocabulary: text("vocabulary"),
   transcript: text("transcript"),
   utterances: text("utterances"),
   // Reading view: transcript reorganized into markdown paragraphs + headings.

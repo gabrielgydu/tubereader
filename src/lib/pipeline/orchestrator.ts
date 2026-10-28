@@ -5,6 +5,7 @@ import { extractMetadata } from "./metadata";
 import { downloadAudio } from "./download";
 import { transcribeAudio } from "./transcribe";
 import { summarizeTranscript } from "./summarize";
+import { formatTranscript } from "./format";
 import { exportVideoMarkdown } from "./export-video-md";
 import { config } from "../config";
 import type { PipelineEvent, VideoStatus } from "../types";
@@ -22,6 +23,7 @@ const STAGE_TIMEOUT_MS = {
   metadata: 3 * MINUTE, // yt-dlp --dump-json, own timeout 60s
   download: 15 * MINUTE, // yt-dlp -x, own timeout 600s
   transcribe: 45 * MINUTE, // 30min poll ceiling + upload/submit fetches, which have none
+  format: 45 * MINUTE, // claude CLI per chunk (300s x 2) x many chunks on long transcripts
   summarize: 15 * MINUTE, // claude CLI, 300s x 2 attempts
 } as const;
 
@@ -72,6 +74,7 @@ class Orchestrator extends EventEmitter {
       "metadata",
       "downloading",
       "transcribing",
+      "formatting",
       "summarizing",
     ];
     const stuck = db
@@ -151,8 +154,51 @@ class Orchestrator extends EventEmitter {
       await withStageTimeout("transcribe", transcribeAudio(videoId, audioPath));
       this.emitEvent(videoId, "transcribing");
 
-      // Stage 4: Summarize
-      await withStageTimeout("summarize", summarizeTranscript(videoId));
+      // Stages 4 & 5 are opt-in per submission. Transcription is always the
+      // floor; summarizing and formatting are the two expensive Claude passes
+      // the user chose (or didn't) when submitting.
+      const opts = db
+        .select({
+          want_summary: schema.videos.want_summary,
+          want_format: schema.videos.want_format,
+        })
+        .from(schema.videos)
+        .where(eq(schema.videos.id, videoId))
+        .get();
+
+      // Stage 4: Format for reading (paragraphs + headings). Best-effort:
+      // formatTranscript writes formatted_transcript but not status, so we set
+      // "formatting" for the UI. A failure or backstop timeout here must NOT
+      // error the whole video or cost it a requested summary — the reading view
+      // is a bonus, and it can be regenerated on demand from the video page. If
+      // the backstop fires, the (uncancelled) formatting keeps running and its
+      // result lands on the finished row later, which is fine.
+      if (opts?.want_format) {
+        db.update(schema.videos)
+          .set({ status: "formatting" })
+          .where(eq(schema.videos.id, videoId))
+          .run();
+        this.emitEvent(videoId, "formatting");
+        try {
+          await withStageTimeout("format", formatTranscript(videoId));
+        } catch (err) {
+          console.error(
+            `[pipeline] video ${videoId} format stage (non-fatal):`,
+            err instanceof Error ? err.message : err
+          );
+        }
+      }
+
+      // Stage 5: Summarize. This stage moves the video to "complete" and stamps
+      // processed_at itself; when it is skipped we do that here instead.
+      if (opts?.want_summary) {
+        await withStageTimeout("summarize", summarizeTranscript(videoId));
+      } else {
+        db.update(schema.videos)
+          .set({ status: "complete", processed_at: new Date().toISOString() })
+          .where(eq(schema.videos.id, videoId))
+          .run();
+      }
 
       // Mirror the finished video to markdown. Last, so the file carries the
       // summary and takeaways rather than a bare transcript.

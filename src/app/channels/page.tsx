@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Channel } from "@/lib/types";
+import type { Channel, LibraryChannel } from "@/lib/types";
 import { formatTimeAgo } from "@/lib/format";
 
 export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [library, setLibrary] = useState<LibraryChannel[]>([]);
+  const [filter, setFilter] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState<number | null>(null);
@@ -19,9 +22,21 @@ export default function ChannelsPage() {
     if (res.ok) setChannels(await res.json());
   }
 
+  async function fetchLibrary() {
+    const res = await fetch("/api/library/channels");
+    if (res.ok) setLibrary(await res.json());
+  }
+
   useEffect(() => {
     fetchChannels();
+    fetchLibrary();
   }, []);
+
+  const filteredLibrary = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return library;
+    return library.filter((c) => c.name.toLowerCase().includes(q));
+  }, [library, filter]);
 
   async function handleSubscribe(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +51,7 @@ export default function ChannelsPage() {
       if (res.ok) {
         setUrl("");
         fetchChannels();
+        fetchLibrary();
       }
     } finally {
       setLoading(false);
@@ -47,6 +63,7 @@ export default function ChannelsPage() {
     try {
       await fetch(`/api/channels/${channelId}/refresh`, { method: "POST" });
       fetchChannels();
+      fetchLibrary();
     } finally {
       setRefreshing(null);
     }
@@ -55,6 +72,7 @@ export default function ChannelsPage() {
   async function handleUnsubscribe(channelId: number) {
     await fetch(`/api/channels/${channelId}`, { method: "DELETE" });
     fetchChannels();
+    fetchLibrary();
   }
 
   return (
@@ -81,6 +99,9 @@ export default function ChannelsPage() {
         </Button>
       </form>
 
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Subscriptions
+      </h2>
       <div className="space-y-3">
         {channels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -137,6 +158,57 @@ export default function ChannelsPage() {
           ))
         )}
       </div>
+
+      {/* Browse by channel — everything already in the library, grouped by
+          channel, whether or not it's subscribed. Lets you read all of one
+          channel's transcripts without subscribing (which would start pulling
+          its whole back catalog). */}
+      {library.length > 0 && (
+        <div className="space-y-3 border-t border-border pt-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Browse by channel
+            </h2>
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter channels…"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className="h-10 sm:h-8 sm:w-64"
+            />
+          </div>
+
+          {filteredLibrary.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No channels match &ldquo;{filter}&rdquo;.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {filteredLibrary.map((ch) => (
+                <li key={ch.channel_id}>
+                  <Link
+                    href={`/channels/by/${encodeURIComponent(ch.channel_id)}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-accent/40"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{ch.name}</span>
+                      {ch.subscribed && (
+                        <Badge variant="secondary" className="shrink-0 text-xs">
+                          Subscribed
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {ch.count} {ch.count === 1 ? "video" : "videos"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
