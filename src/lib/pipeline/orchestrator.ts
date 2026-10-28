@@ -13,7 +13,7 @@ import type { PipelineEvent, VideoStatus } from "../types";
 const MINUTE = 60_000;
 
 // Backstop timeout per stage. Every stage already bounds its own work (yt-dlp
-// is spawned with a 60s/600s timeout, AssemblyAI polling gives up after 30min,
+// is spawned with a 60s/600s timeout, stt is stopped after 35min,
 // the claude CLI after 300s per attempt), so these budgets are deliberately
 // longer: whenever a stage is merely slow, its own error message should win.
 // They exist for the stage promise that never settles at all — a child that
@@ -22,7 +22,7 @@ const MINUTE = 60_000;
 const STAGE_TIMEOUT_MS = {
   metadata: 3 * MINUTE, // yt-dlp --dump-json, own timeout 60s
   download: 15 * MINUTE, // yt-dlp -x, own timeout 600s
-  transcribe: 45 * MINUTE, // 30min poll ceiling + upload/submit fetches, which have none
+  transcribe: 45 * MINUTE, // stt: one 35min deadline for both runs + 30s kill grace
   format: 45 * MINUTE, // claude CLI per chunk (300s x 2) x many chunks on long transcripts
   summarize: 15 * MINUTE, // claude CLI, 300s x 2 attempts
 } as const;

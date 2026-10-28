@@ -1,9 +1,8 @@
 # tubeReader
 
-Paste a YouTube, Instagram or SoundCloud link; get back a transcript, a
-summary, key takeaways and timestamps you can search across. Next.js 16 +
-SQLite (better-sqlite3 + Drizzle), transcription via AssemblyAI, summarizing
-and transcript formatting via the local `claude` CLI.
+Paste a YouTube, Instagram or SoundCloud link; get back a transcript, a summary, key takeaways and timestamps you can search across.
+
+Next.js 16 + SQLite (better-sqlite3 + Drizzle), transcription via stt (Soniox by default), summarizing and transcript formatting via the local `claude` CLI.
 
 Everything runs on this machine — the database, the audio, the pipeline. It is
 reachable from the phone over Tailscale, not the public internet.
@@ -97,19 +96,47 @@ redirecting, so the tab always shows what the database holds now.
 resolves there — the phone gets a dead tab unless notas is published somewhere
 it can reach and `TUBEREADER_NOTAS_URL` points at that address.
 
+## Transcription
+
+Transcription goes through stt (`~/development/stt`), the speech-to-text command the tools on this machine share: one `stt transcribe --json` run per video.
+
+stt picks the provider (Soniox by default, AssemblyAI selectable) and holds its API key, both in `~/.config/stt/config`, so tubereader holds no key.
+
+`stt check` shows what is configured.
+
+The systemd unit's `PATH` includes `~/.local/bin`, where stt's `install.sh` links it; `TUBEREADER_STT_BIN` points at another copy.
+
+Videos go without language hints, so the provider detects the language, and without key terms unless a vocabulary is chosen (below).
+
+The hints and key terms in stt's config are meant for this machine's own recordings and never reach a video.
+
+A video longer than the provider accepts (5 h on Soniox, `max_seconds` in `stt check --json`) fails before anything is uploaded.
+
+A transient failure (network, provider outage, rate limit) gets one more run 10 s later.
+
+It gets none when stt says it may have left something at the provider that it cannot delete, or when stt cut its last line short so that cannot be told, because another run could leave one more.
+
+Any other failure stores stt's last line (`stt: …`) as the video's error.
+
+The whole transcription gets 35 minutes; then stt is stopped with SIGTERM, which deletes the job at the provider.
+
+`npm test` covers this path against stt's fake provider, with no key and no network.
+
 ## Transcription vocabularies
 
-AssemblyAI mishears proper nouns it rarely hears: Catholic meditations came back with "São José Maria" for "São Josemaria".
+The speech-to-text model mishears proper nouns it rarely hears: Catholic meditations came back with "São José Maria" for "São Josemaria".
 
 A submission can name a vocabulary, with the **Vocabulary** picker under the URL box (remembered like the two checkboxes) or `"vocabulary": "catolico"` in a `POST /api/videos` body.
 
-Its key terms go to AssemblyAI's `keyterms_prompt` and its fixed spellings to `custom_spelling`.
+Its key terms go to stt as a terms file, one per line, so a term may contain commas.
 
-The model list is then pinned to Universal-3.5 Pro with Universal-2 as fallback, since key terms need one of those.
+Its fixed spellings go as a spellings file, which stt applies to the finished transcript whichever provider ran it.
 
 Vocabularies live in `src/lib/vocabulary.ts`.
 
-Keep each list under 200 terms of at most 6 words (the Universal-2 limit), and each `custom_spelling` target a single word (AssemblyAI rejects anything else).
+Keep each list under 200 terms of at most 6 words, so AssemblyAI, still selectable in stt, gets all of it (its Universal-2 fallback reads only the first 200).
+
+A spelling's `to` may be several words.
 
 The choice is stored on the video (`videos.vocabulary`), so a retry reuses it, and the markdown mirror records it in its frontmatter.
 
@@ -124,7 +151,7 @@ Share-sheet submissions don't pick one.
   single source of truth for nav entries.
 - `src/lib/pipeline/` — `orchestrator` runs the queue (3 concurrent) through
   metadata → download → transcribe → summarize → format. It shells out to
-  `yt-dlp`, `gallery-dl` and `claude`, which is why the systemd unit sets an
+  `yt-dlp`, `gallery-dl`, `stt` and `claude`, which is why the systemd unit sets an
   explicit `PATH` and `DBUS_SESSION_BUS_ADDRESS` (the latter for
   `--cookies-from-browser`).
 - `src/lib/db/` — schema and migrations, applied on first connection.
@@ -141,6 +168,7 @@ Share-sheet submissions don't pick one.
 ```bash
 npm run typecheck     # tsc --noEmit
 npm run lint
+npm test              # node --test: the stt adapter, against stt's fake provider
 npm run build
 ```
 

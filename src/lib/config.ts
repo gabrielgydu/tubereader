@@ -1,28 +1,5 @@
-import { readFileSync } from "fs";
 import path from "path";
 import os from "os";
-
-function loadAssemblyAIKey(): string {
-  const configPath = path.join(
-    os.homedir(),
-    ".config",
-    "audiorecorder",
-    "config"
-  );
-  try {
-    const content = readFileSync(configPath, "utf-8");
-    const match = content.match(/^assemblyai_api_key=(.+)$/m);
-    if (match) return match[1].trim();
-  } catch {
-    // fall through
-  }
-  if (process.env.ASSEMBLYAI_API_KEY) return process.env.ASSEMBLYAI_API_KEY;
-  throw new Error(
-    "AssemblyAI API key not found in ~/.config/audiorecorder/config or ASSEMBLYAI_API_KEY env"
-  );
-}
-
-let cachedKey: string | null = null;
 
 export const config = {
   dbPath:
@@ -36,11 +13,6 @@ export const config = {
   markdownDir:
     process.env.TUBEREADER_MD_DIR ||
     path.join(os.homedir(), "recordings", "tubereader"),
-  // Resolved on first use, not at import time: every module that touches the
-  // DB or the UI imports this file, and none of them need a transcription key.
-  get assemblyAIKey(): string {
-    return (cachedKey ??= loadAssemblyAIKey());
-  },
   maxConcurrency: 3,
   maxTranscriptLength: 100_000,
   // Browser to load cookies from for authenticated sources (Instagram).

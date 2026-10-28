@@ -1,15 +1,20 @@
 /**
- * Transcription vocabularies: domain terms AssemblyAI should recognize, chosen
- * per submission. Without them the model guesses at proper nouns it rarely
- * hears — Catholic meditations came back with "São José Maria" for
- * "São Josemaria", and "nosso padre" for "nosso Padre".
+ * Transcription vocabularies: domain terms the speech-to-text provider should
+ * recognize, chosen per submission. Without them the model guesses at proper
+ * nouns it rarely hears — Catholic meditations came back with "São José Maria"
+ * for "São Josemaria", and "nosso padre" for "nosso Padre".
  *
- * `keyterms` goes to `keyterms_prompt`: Universal-3.5 Pro takes up to 1,000
- * terms, the Universal-2 fallback only 200, each at most 6 words. Keep every
- * list under 200 so a fallback never rejects the request.
+ * Both go to stt (pipeline/stt.ts), which runs the configured provider.
  *
- * `customSpelling` goes to `custom_spelling`: an exact rewrite applied after
- * recognition. AssemblyAI requires each `to` to be a single word.
+ * `keyterms` becomes stt's terms file, one term per line, so a term may contain
+ * commas. Soniox takes the whole list; AssemblyAI, still selectable in stt's
+ * config, drops terms over 6 words and its Universal-2 fallback uses only the
+ * first 200. Keep every list under 200 terms of at most 6 words so either
+ * provider gets all of it.
+ *
+ * `customSpelling` becomes stt's spellings file: a rewrite stt applies to the
+ * finished transcript whatever the provider. A `from` form matches as a whole
+ * word regardless of case, the longest form wins, and `to` may be several words.
  */
 export interface Vocabulary {
   label: string;

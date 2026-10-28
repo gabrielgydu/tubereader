@@ -11,6 +11,7 @@
     "start": "next start --port 3700 --hostname 127.0.0.1",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test 'test/*.test.mjs'",
     "icons": "./scripts/make-icons.sh",
     "export-md": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/export-md.mjs"
   },
